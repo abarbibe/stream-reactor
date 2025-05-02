@@ -80,16 +80,19 @@ class MqttWriter(client: MqttClient, settings: MqttSinkSettings, convertersMap: 
                       k.hasRetainStructure,
                     )
 
-                    //get kafka message key if asked for
+                    mqttTarget = k.getTarget
+
+                    // If there is a _key placeholder, replace it with the message key
+                    if (mqttTarget.contains("_key")) {
+                      mqttTarget = mqttTarget.replace("_key", r.key().toString)
+                    }
+
+                    // If there is a dynamic target, extract the value and replace the placeholders
                     if (Option(k.getDynamicTarget).getOrElse("").nonEmpty) {
-                      val mqtttopic = (parse(transformed.toString) \ k.getDynamicTarget).extractOrElse[String](null)
-                      if (mqtttopic.nonEmpty) {
-                        mqttTarget = mqtttopic
+                      val extracted = (parse(transformed.toString) \ k.getDynamicTarget).extractOrElse[String](null)
+                      if (extracted.nonEmpty) {
+                        mqttTarget = mqttTarget.replace("$" + k.getDynamicTarget, extracted)
                       }
-                    } else if (k.getTarget == "_key") {
-                      mqttTarget = r.key().toString
-                    } else {
-                      mqttTarget = k.getTarget
                     }
 
                     val converter = convertersMap.getOrElse(k.getSource, null)
